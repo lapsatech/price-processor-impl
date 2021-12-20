@@ -36,7 +36,7 @@ public class QueuedPriceProcesorJob implements Runnable {
   @Override
   public void run() {
     try {
-      while (true) {
+      while (!Thread.currentThread().isInterrupted()) {
         final Entry<String, Double> e;
         if (finshOnEmptyQueue) {
           e = queue.peek();
