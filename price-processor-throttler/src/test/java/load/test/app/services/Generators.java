@@ -26,7 +26,6 @@ public class Generators implements AutoCloseable {
   }
 
   public void stop() {
-    priceGenerators.forEach(SamplePriceGenerator::interrupt);
     generatorsTasks.forEach(future -> {
       if (!future.isDone()) {
         future.cancel(true);

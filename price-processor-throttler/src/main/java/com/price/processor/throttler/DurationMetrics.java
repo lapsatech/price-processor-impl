@@ -46,6 +46,10 @@ public final class DurationMetrics {
   public interface Measure extends AutoCloseable {
     @Override
     void close();
+
+    default void complete() {
+      close();
+    }
   }
 
   public Measure newMeasure() {

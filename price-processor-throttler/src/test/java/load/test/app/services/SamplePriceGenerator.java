@@ -77,18 +77,16 @@ public class SamplePriceGenerator {
     this.initialDelay = requireNonNull(initialDelay, "initialDelay");
   }
 
-  private volatile boolean interrupted = false;
-
   private DurationMetrics consumerPerfomanceMetrics = new DurationMetrics();
 
   public void run(PriceProcessor consumer) {
     LOGGER.info("Started '{}'", ccyPair);
     try {
       threadSleep(initialDelay);
-      while (!interrupted) {
-        try (Measure m = consumerPerfomanceMetrics.newMeasure()) {
-          consumer.onPrice(ccyPair, random.nextDouble());
-        }
+      while (!Thread.currentThread().isInterrupted()) {
+        Measure m = consumerPerfomanceMetrics.newMeasure();
+        consumer.onPrice(ccyPair, random.nextDouble());
+        m.complete();
         threadSleep(frequency);
       }
     } catch (InterruptedException e) {
@@ -100,9 +98,5 @@ public class SamplePriceGenerator {
 
   public void logStats() {
     LOGGER.info("<--- '{}' pair consumption stats are {}", ccyPair, consumerPerfomanceMetrics.getStats());
-  }
-
-  public void interrupt() {
-    interrupted = true;
   }
 }
