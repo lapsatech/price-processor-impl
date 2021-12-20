@@ -17,27 +17,26 @@ class PriceThrottlerTest extends Specification {
     def s2 = Mock(PriceProcessor)
     def s3 = Mock(PriceProcessor)
 
-
     when:
     pt.subscribe(s1)
     pt.subscribe(s2)
     pt.subscribe(s3)
 
     then:
-    pt.subscribers() == 3
+    pt.subscribersCount == 3
 
     when:
     pt.unsubscribe(s1)
 
     then:
-    pt.subscribers() == 2
+    pt.subscribersCount == 2
 
     then:
     pt.unsubscribe(s2)
     pt.unsubscribe(s3)
 
     then:
-    pt.subscribers() == 0
+    pt.subscribersCount == 0
 
     cleanup:
     pool.shutdownNow()
