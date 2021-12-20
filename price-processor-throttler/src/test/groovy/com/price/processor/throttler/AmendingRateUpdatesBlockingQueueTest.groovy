@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 
 import spock.lang.Specification
 
-class AmendingRateUpdateBlockingQueueTest extends Specification {
+class AmendingRateUpdatesBlockingQueueTest extends Specification {
 
 
   def 'test take amending rate and order'() {
