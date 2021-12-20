@@ -6,13 +6,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 public final class DurationMetrics {
 
-  private final AtomicLong numberOfIterations = new AtomicLong(0); // also used to sync operations over class metrics
+  private final ReentrantLock lock = new ReentrantLock();
+
+  private long numberOfIterations = 0;
   private Duration totalDuration = Duration.ZERO;
   private Duration averageDuration = null;
 
@@ -28,15 +29,18 @@ public final class DurationMetrics {
   }
 
   public long add(Duration duration) {
-    return numberOfIterations.updateAndGet(number -> {
-      number++;
+    lock.lock();
+    try {
+      numberOfIterations++;
       totalDuration = totalDuration.plus(duration);
-      averageDuration = totalDuration.dividedBy(number);
+      averageDuration = totalDuration.dividedBy(numberOfIterations);
       if (parent != null) {
         parent.add(duration);
       }
-      return number;
-    });
+    } finally {
+      lock.unlock();
+    }
+    return numberOfIterations;
   }
 
   public interface Measure extends AutoCloseable {
@@ -110,12 +114,12 @@ public final class DurationMetrics {
   }
 
   public Stats getStats() {
-    AtomicReference<Stats> ref = new AtomicReference<>();
-    numberOfIterations.updateAndGet(count -> {
-      ref.set(new Stats(count, totalDuration, averageDuration));
-      return count;
-    });
-    return ref.get();
+    lock.lock();
+    try {
+      return new Stats(numberOfIterations, totalDuration, averageDuration);
+    } finally {
+      lock.unlock();
+    }
   }
 
   public Map<Object, Stats> getGroupsStats() {
@@ -123,5 +127,4 @@ public final class DurationMetrics {
         .stream()
         .collect(Collectors.toMap(Entry::getKey, e -> e.getValue().getStats()));
   }
-
 }

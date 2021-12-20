@@ -22,7 +22,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer slowConsumer1() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_30_MIN_#1")
-        .withConsumerDuration(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
+        .withProcessTime(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
         .build();
   }
 
@@ -30,7 +30,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer slowConsumer2() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_30_MIN_#2")
-        .withConsumerDuration(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
+        .withProcessTime(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
         .build();
   }
 
@@ -38,7 +38,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer slowConsumer3() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_30_MIN_#3")
-        .withConsumerDuration(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
+        .withProcessTime(Duration.ofMinutes(30)) // very slow (onPrice() might take 30 minutes)
         .build();
   }
 
@@ -46,7 +46,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer avgConsumer1() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MIN_#1")
-        .withConsumerDuration(Duration.ofMinutes(1))
+        .withProcessTime(Duration.ofMinutes(1))
         .build();
   }
 
@@ -54,7 +54,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer avgConsumer2() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MIN_#2")
-        .withConsumerDuration(Duration.ofMinutes(1))
+        .withProcessTime(Duration.ofMinutes(1))
         .build();
   }
 
@@ -62,7 +62,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer avgConsumer3() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MIN_#3")
-        .withConsumerDuration(Duration.ofMinutes(1))
+        .withProcessTime(Duration.ofMinutes(1))
         .build();
   }
 
@@ -70,7 +70,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer fastConsumer1() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MICROSEC_#1")
-        .withConsumerDuration(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
+        .withProcessTime(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
         .build();
   }
 
@@ -78,7 +78,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer fastConsumer2() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MICROSEC_#2")
-        .withConsumerDuration(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
+        .withProcessTime(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
         .build();
   }
 
@@ -86,7 +86,7 @@ public class PriceThrottllerConfig {
   public SamplePriceConsumer fastConsumer3() {
     return SamplePriceConsumer.buillder()
         .withName("TAKES_1_MICROSEC_#3")
-        .withConsumerDuration(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
+        .withProcessTime(Duration.ofNanos(1000)) // very fast (i.e. onPrice() for them will only take a microsecond)
         .build();
   }
 

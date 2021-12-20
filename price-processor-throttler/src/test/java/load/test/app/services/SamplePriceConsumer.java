@@ -18,29 +18,29 @@ public class SamplePriceConsumer implements PriceProcessor {
 
   public static class Builder {
 
-    private Duration consumerDuration;
+    private Duration processTime;
     private String name = "UNNAMED";
 
     private Builder() {
     }
 
-    public Builder withConsumerDuration(Duration workTime) {
-      this.consumerDuration = workTime;
+    public Builder withProcessTime(Duration processTime) {
+      this.processTime = processTime;
       return this;
     }
 
-    public Builder withConsumerDurationMilis(long workTimeMilis) {
-      this.consumerDuration = Duration.ofMillis(workTimeMilis);
+    public Builder withProcessTimeMilis(long workTimeMilis) {
+      this.processTime = Duration.ofMillis(workTimeMilis);
       return this;
     }
 
-    public Builder withConsumerDurationNanos(long workTimeNanos) {
-      this.consumerDuration = Duration.ofNanos(workTimeNanos);
+    public Builder withProcessTimeNanos(long workTimeNanos) {
+      this.processTime = Duration.ofNanos(workTimeNanos);
       return this;
     }
 
-    public Builder withConsumerDuration(long workTimeMilis, long workTimeNanos) {
-      this.consumerDuration = Duration.ofMillis(workTimeMilis).plusNanos(workTimeNanos);
+    public Builder withProcessTime(long workTimeMilis, long workTimeNanos) {
+      this.processTime = Duration.ofMillis(workTimeMilis).plusNanos(workTimeNanos);
       return this;
     }
 
@@ -50,7 +50,7 @@ public class SamplePriceConsumer implements PriceProcessor {
     }
 
     public SamplePriceConsumer build() {
-      return new SamplePriceConsumer(consumerDuration, name);
+      return new SamplePriceConsumer(processTime, name);
     }
   }
 
@@ -62,8 +62,8 @@ public class SamplePriceConsumer implements PriceProcessor {
 
   private final String name;
 
-  private SamplePriceConsumer(Duration workTime, String name) {
-    this.processTime = requireNonNull(workTime, "workTime");
+  private SamplePriceConsumer(Duration processTime, String name) {
+    this.processTime = requireNonNull(processTime, "processTime");
     this.name = requireNonNull(name, "name");
   }
 
