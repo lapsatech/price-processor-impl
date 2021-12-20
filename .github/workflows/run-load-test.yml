@@ -1,10 +1,15 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
+name: Build and run load test
 
-name: Run load test
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration to run'
+        default: 'PT20S'
+        required: true
 
 jobs:
-  build:
+  build-and-run:
 
     runs-on: ubuntu-latest
 
@@ -19,5 +24,4 @@ jobs:
     - name: Build with Maven
       run: mvn -B install
     - name: Run load test
-      run: mvn -B --file price-processor-throttler/pom.xml -Prun-load-test-app
-
+      run: mvn -B --file price-processor-throttler/pom.xml -Prun-load-test-app -Dduration=${{ github.event.inputs.duration }}
