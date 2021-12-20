@@ -7,7 +7,7 @@ import org.apache.logging.log4j.spi.LoggerContextFactory;
 
 public class MainRunner {
 
-  static void registerShutdownHook(Runnable runnable) {
+  private static void registerShutdownHook(Runnable appShutdown) {
 
     final LoggerContextFactory factory = LogManager.getFactory();
     if (factory instanceof Log4jContextFactory) {
@@ -17,7 +17,7 @@ public class MainRunner {
 
     final Runnable shutdown = () -> {
       try {
-        runnable.run();
+        appShutdown.run();
       } finally {
         LogManager.shutdown();
       }
