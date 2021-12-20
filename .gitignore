@@ -1,2 +1,5 @@
-.*
-target/
+# eclipse IDE stuff
+.project
+.classpath
+.settings
+target
