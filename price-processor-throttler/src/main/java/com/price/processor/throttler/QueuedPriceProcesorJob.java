@@ -17,6 +17,8 @@ public class QueuedPriceProcesorJob implements Runnable {
   private final PriceProcessor priceProcessor;
   private final DurationMetrics processorMetrics = new DurationMetrics();
 
+  private transient boolean finshOnEmptyQueue = false;
+
   public QueuedPriceProcesorJob(PriceProcessor priceProcessor) {
     this.priceProcessor = priceProcessor;
     this.queue = new AmendingRateUpdatesBlockingQueue();
@@ -30,19 +32,23 @@ public class QueuedPriceProcesorJob implements Runnable {
   public void queue(String ccyPair, double rate) {
     queue.offer(ccyPair, rate);
   }
-  
-  private void tick() throws InterruptedException {
-    Entry<String, Double> e = queue.take();
-    try (Measure m = processorMetrics.newMeasure()) {
-      priceProcessor.onPrice(e.getKey(), e.getValue().doubleValue());
-    }
-  }
 
   @Override
   public void run() {
     try {
       while (true) {
-        tick();
+        final Entry<String, Double> e;
+        if (finshOnEmptyQueue) {
+          e = queue.peek();
+          if (e == null) {
+            return; // finish if queue is empty
+          }
+        } else {
+          e = queue.take();
+        }
+        try (Measure m = processorMetrics.newMeasure()) {
+          priceProcessor.onPrice(e.getKey(), e.getValue().doubleValue());
+        }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -53,5 +59,9 @@ public class QueuedPriceProcesorJob implements Runnable {
 
   public Stats getStats() {
     return processorMetrics.getStats();
+  }
+
+  public void requestStop() {
+    finshOnEmptyQueue = true;
   }
 }
