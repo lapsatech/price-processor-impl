@@ -1,6 +1,6 @@
 package com.price.processor.throttler;
 
-import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -8,6 +8,8 @@ import java.util.concurrent.Future;
 import com.price.processor.PriceProcessor;
 
 public class PriceThrottler implements PriceProcessor, AutoCloseable {
+
+  private transient boolean stateClosed = false;
 
   private static class RegistryEntry {
 
@@ -34,6 +36,9 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
   @Override
   public void subscribe(PriceProcessor priceProcessor) {
+    if (stateClosed) {
+      throw new IllegalStateException("Resource is closed");
+    }
     if (priceProcessor == this) {
       throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
     }
@@ -58,12 +63,14 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     return processorsRegistry.size();
   }
 
-  public void unsubscribeAll() {
-    new ArrayList<>(processorsRegistry.keySet()).forEach(this::unsubscribe);
-  }
-
   @Override
   public void close() {
-    unsubscribeAll();
+    stateClosed = true;
+    while (!processorsRegistry.isEmpty()) {
+      Enumeration<PriceProcessor> procs = processorsRegistry.keys();
+      while (procs.hasMoreElements()) {
+        unsubscribe(procs.nextElement());
+      }
+    }
   }
 }
