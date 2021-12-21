@@ -52,11 +52,8 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
 
   @Override
   public Entry<String, Double> take() throws InterruptedException {
-    while (true) {
-      Entry<String, Double> e = peek();
-      if (e != null) {
-        return e;
-      }
+    Entry<String, Double> e;
+    while ((e = peek()) == null) {
       lock.lock();
       try {
         notEmpty.await();
@@ -64,6 +61,7 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
         lock.unlock();
       }
     }
+    return e;
   }
 
   @Override
