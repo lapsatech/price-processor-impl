@@ -1,13 +1,13 @@
 package com.price.processor.test.app.config;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -20,6 +20,9 @@ import com.price.processor.throttler.PriceThrottler;
 @Configuration
 @Import(PriceThrottllerConfig.class)
 public class GeneratorsConfig {
+
+  @Autowired
+  private PriceThrottler priceThrottler;
 
   @Bean
   public SamplePriceGenerator continuouslyPairGenerator() {
@@ -66,14 +69,9 @@ public class GeneratorsConfig {
   @Autowired
   private BeanFactory factory;
 
-  @Autowired
-  private PriceThrottler priceThrottler;
-
   @Bean
-  public Generators generators(
-      @Autowired @Qualifier("generatorsPool") ExecutorService generatorsPool) {
-    return new Generators(generatorsPool, factory.getBeanProvider(SamplePriceGenerator.class)
-        .stream()
-        .collect(Collectors.toList()));
+  public Generators generators() {
+    List<SamplePriceGenerator> generators = factory.getBeanProvider(SamplePriceGenerator.class).stream().collect(Collectors.toList());
+    return new Generators(generatorsPool(), generators);
   }
 }
