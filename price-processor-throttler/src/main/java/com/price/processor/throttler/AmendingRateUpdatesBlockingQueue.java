@@ -37,18 +37,16 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
 
   @Override
   public Entry<String, Double> peek() {
-    while (true) {
-      lock.lock();
-      try {
-        Iterator<Entry<String, Double>> i = queue.entrySet().iterator();
-        Entry<String, Double> e = i.next();
-        i.remove();
-        return e;
-      } catch (NoSuchElementException e1) {
-        return null;
-      } finally {
-        lock.unlock();
-      }
+    lock.lock();
+    try {
+      Iterator<Entry<String, Double>> i = queue.entrySet().iterator();
+      Entry<String, Double> e = i.next();
+      i.remove();
+      return e;
+    } catch (NoSuchElementException e1) {
+      return null;
+    } finally {
+      lock.unlock();
     }
   }
 
