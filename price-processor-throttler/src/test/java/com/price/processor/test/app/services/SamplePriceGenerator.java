@@ -1,4 +1,4 @@
-package load.test.app.services;
+package com.price.processor.test.app.services;
 
 import static com.price.processor.throttler.DurationUtils.threadSleep;
 import static java.util.Objects.requireNonNull;
@@ -13,13 +13,14 @@ import com.price.processor.PriceProcessor;
 import com.price.processor.throttler.DurationMetrics;
 import com.price.processor.throttler.DurationMetrics.Measure;
 
-public class SamplePriceGenerator {
+public class SamplePriceGenerator implements Runnable {
 
   public static class Builder {
 
     private String ccyPair;
     private Duration initialDelay = Duration.ZERO;
     private Duration frequency = Duration.ofMillis(100);
+    private PriceProcessor priceProcessor;
 
     private Builder() {
     }
@@ -55,7 +56,12 @@ public class SamplePriceGenerator {
     }
 
     public SamplePriceGenerator build() {
-      return new SamplePriceGenerator(ccyPair, frequency, initialDelay);
+      return new SamplePriceGenerator(priceProcessor, ccyPair, frequency, initialDelay);
+    }
+
+    public Builder withConsumer(PriceProcessor priceProcessor) {
+      this.priceProcessor = priceProcessor;
+      return this;
     }
   }
 
@@ -70,33 +76,33 @@ public class SamplePriceGenerator {
   private final String ccyPair;
   private final Duration frequency;
   private final Duration initialDelay;
+  private final PriceProcessor priceProcessor;
+  private final DurationMetrics consumerPerfomanceMetrics = new DurationMetrics();
 
-  public SamplePriceGenerator(String ccyPair, Duration frequency, Duration initialDelay) {
+  public SamplePriceGenerator(PriceProcessor priceProcessor, String ccyPair, Duration frequency, Duration initialDelay) {
     this.ccyPair = requireNonNull(ccyPair, "ccyPair");
     this.frequency = requireNonNull(frequency, "frequency");
     this.initialDelay = requireNonNull(initialDelay, "initialDelay");
+    this.priceProcessor = requireNonNull(priceProcessor, "priceProcessor");
   }
 
-  private DurationMetrics consumerPerfomanceMetrics = new DurationMetrics();
-
-  public void run(PriceProcessor consumer) {
-    LOGGER.info("Started '{}'", ccyPair);
+  @Override
+  public void run() {
     try {
       threadSleep(initialDelay);
       while (!Thread.currentThread().isInterrupted()) {
         Measure m = consumerPerfomanceMetrics.newMeasure();
-        consumer.onPrice(ccyPair, random.nextDouble());
+        priceProcessor.onPrice(ccyPair, random.nextDouble());
         m.complete();
         threadSleep(frequency);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-    } finally {
-      LOGGER.info("Finished '{}'", ccyPair);
     }
   }
 
   public void logStats() {
     LOGGER.info("<--- '{}' pair consumption stats are {}", ccyPair, consumerPerfomanceMetrics.getStats());
   }
+
 }

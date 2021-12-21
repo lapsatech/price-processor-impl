@@ -1,7 +1,6 @@
-package load.test.app.config;
+package com.price.processor.test.app.config;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -11,12 +10,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
-import load.test.app.services.Generators;
-import load.test.app.services.NamePrefixThreadFactory;
-import load.test.app.services.SamplePriceGenerator;
+import com.price.processor.test.app.services.Generators;
+import com.price.processor.test.app.services.NamePrefixThreadFactory;
+import com.price.processor.test.app.services.SamplePriceGenerator;
+import com.price.processor.throttler.PriceThrottler;
 
 @Configuration
+@Import(PriceThrottllerConfig.class)
 public class GeneratorsConfig {
 
   @Bean
@@ -24,6 +26,7 @@ public class GeneratorsConfig {
     return SamplePriceGenerator.builder()
         .withCcyPair("CONTINUOUS_GEN_PAIR")
         .withFrequencyMillis(1 * 1_000 / 100) // 100 times per second
+        .withConsumer(priceThrottler)
         .build();
   }
 
@@ -32,6 +35,7 @@ public class GeneratorsConfig {
     return SamplePriceGenerator.builder()
         .withCcyPair("ONES_PER_SEC_PAIR")
         .withFrequency(Duration.ofSeconds(1))
+        .withConsumer(priceThrottler)
         .build();
   }
 
@@ -40,6 +44,7 @@ public class GeneratorsConfig {
     return SamplePriceGenerator.builder()
         .withCcyPair("ONES_PER_MIN_PAIR")
         .withFrequency(Duration.ofMinutes(1)) // every minute
+        .withConsumer(priceThrottler)
         .build();
   }
 
@@ -49,6 +54,7 @@ public class GeneratorsConfig {
         .withCcyPair("ONES_PER_DAY_PAIR")
         .withInitialDelay(Duration.ofMinutes(20))
         .withFrequency(Duration.ofDays(1)) // once per day
+        .withConsumer(priceThrottler)
         .build();
   }
 
@@ -60,14 +66,14 @@ public class GeneratorsConfig {
   @Autowired
   private BeanFactory factory;
 
+  @Autowired
+  private PriceThrottler priceThrottler;
+
   @Bean
   public Generators generators(
       @Autowired @Qualifier("generatorsPool") ExecutorService generatorsPool) {
-
-    List<SamplePriceGenerator> samplePriceGenerators = factory.getBeanProvider(SamplePriceGenerator.class)
+    return new Generators(generatorsPool, factory.getBeanProvider(SamplePriceGenerator.class)
         .stream()
-        .collect(Collectors.toList());
-
-    return new Generators(generatorsPool, samplePriceGenerators);
+        .collect(Collectors.toList()));
   }
 }
