@@ -9,7 +9,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import com.price.processor.test.app.config.AppConfig;
 import com.price.processor.test.app.services.App;
 
-public class MainRunner {
+public class Main {
 
   private static void registerShutdownHook(Runnable appShutdown) {
 
