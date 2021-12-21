@@ -1,4 +1,4 @@
-package load.test.app.services;
+package com.price.processor.test.app.services;
 
 import static com.price.processor.throttler.DurationUtils.threadSleep;
 import static java.util.Objects.requireNonNull;

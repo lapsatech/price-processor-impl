@@ -64,7 +64,7 @@
             <artifactId>exec-maven-plugin</artifactId>
             <configuration>
               <classpathScope>test</classpathScope>
-              <mainClass>load.test.app.MainRunner</mainClass>
+              <mainClass>com.price.processor.test.app.Main</mainClass>
             </configuration>
           </plugin>
         </plugins>
