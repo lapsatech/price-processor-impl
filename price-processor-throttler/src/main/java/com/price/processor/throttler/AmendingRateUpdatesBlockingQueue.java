@@ -25,8 +25,8 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
 
   @Override
   public void offer(String ccyPair, double rate) {
+    lock.lock();
     try {
-      lock.lock();
       queue.put(ccyPair, rate);
       notEmpty.signal();
     } finally {
@@ -57,8 +57,8 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
       if (e != null) {
         return e;
       }
+      lock.lock();
       try {
-        lock.lock();
         notEmpty.await();
       } finally {
         lock.unlock();
@@ -72,16 +72,18 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
     if (e != null) {
       return e;
     }
+    final boolean assumeNotEmpty;
+    lock.lock();
     try {
-      lock.lock();
-      if (notEmpty.await(time, unit)) {
-        e = peek();
-        if (e != null) {
-          return e;
-        }
-      }
+      assumeNotEmpty = notEmpty.await(time, unit);
     } finally {
       lock.unlock();
+    }
+    if (assumeNotEmpty) {
+      e = peek();
+      if (e != null) {
+        return e;
+      }
     }
     throw new TimeoutException();
   }
