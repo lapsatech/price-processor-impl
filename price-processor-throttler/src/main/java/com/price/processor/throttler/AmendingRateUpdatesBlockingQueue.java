@@ -72,16 +72,18 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
     if (e != null) {
       return e;
     }
+
     lock.lock();
     try {
       if (notEmpty.await(time, unit)) {
         e = peek();
-        if (e != null) {
-          return e;
-        }
       }
     } finally {
       lock.unlock();
+    }
+
+    if (e != null) {
+      return e;
     }
     throw new TimeoutException();
   }
