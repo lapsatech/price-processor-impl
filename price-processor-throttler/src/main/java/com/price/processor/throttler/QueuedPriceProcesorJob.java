@@ -48,12 +48,12 @@ public class QueuedPriceProcesorJob implements Runnable {
         }
         try (Measure m = processorMetrics.newMeasure()) {
           priceProcessor.onPrice(e.getKey(), e.getValue().doubleValue());
+        } catch (RuntimeException re) {
+          LOG.error("Excecption occured while running price processor job", re);
         }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-    } catch (RuntimeException re) {
-      LOG.error("Excecption occured while running price processor job", re);
     }
   }
 
