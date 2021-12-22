@@ -1,10 +1,9 @@
 package com.price.processor.throttler;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
@@ -21,30 +20,31 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
 
-  private final Map<String, RateUpdate> queue = new LinkedHashMap<>();
+  private final Map<String, RateUpdate> rates = new HashMap<>(200);
+  private final Queue<String> queue = new LinkedList<>();
 
   @Override
   public void offer(RateUpdate update) {
     lock.lock();
     try {
-      queue.put(update.getCcyPair(), update);
-      notEmpty.signal();
+      if (rates.put(update.getCcyPair(), update) == null) {// if new ccyPair
+        queue.offer(update.getCcyPair()); // put to the queue
+        notEmpty.signal();
+      }
     } finally {
       lock.unlock();
     }
-
   }
 
   @Override
   public RateUpdate poll() {
     lock.lock();
     try {
-      Iterator<Entry<String, RateUpdate>> i = queue.entrySet().iterator();
-      Entry<String, RateUpdate> e = i.next();
-      i.remove();
-      return e.getValue();
-    } catch (NoSuchElementException e1) {
-      return null;
+      final String ccyPair = queue.poll();
+      if (ccyPair == null) {
+        return null;
+      }
+      return rates.remove(ccyPair);
     } finally {
       lock.unlock();
     }
