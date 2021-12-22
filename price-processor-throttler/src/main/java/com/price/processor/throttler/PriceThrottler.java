@@ -5,9 +5,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.price.processor.PriceProcessor;
+import com.price.processor.throttler.DurationMetrics.Measure;
 
 public class PriceThrottler implements PriceProcessor, AutoCloseable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PriceThrottler.class);
 
   private transient boolean stateClosed = false;
 
@@ -29,9 +35,13 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     this.threadPool = threadPool;
   }
 
+  private final DurationMetrics dm = new DurationMetrics();
+
   @Override
   public void onPrice(String ccyPair, double rate) {
-    processorsRegistry.forEach((priceProcessor, registryEntry) -> registryEntry.proc.queue(ccyPair, rate));
+    try (Measure m = dm.newMeasure()) {
+      processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(ccyPair, rate));
+    }
   }
 
   @Override
@@ -43,7 +53,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
       throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
     }
     processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
-      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(priceProcessor);
+      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp);
       Future<?> processFuture = threadPool.submit(proc);
       return new RegistryEntry(proc, processFuture);
     });
@@ -65,6 +75,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
   @Override
   public void close() {
+    LOG.info("onPrice stats are {}", dm.getStats());
     stateClosed = true;
     while (!processorsRegistry.isEmpty()) {
       Enumeration<PriceProcessor> procs = processorsRegistry.keys();
