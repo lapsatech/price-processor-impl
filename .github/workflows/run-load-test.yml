@@ -37,3 +37,5 @@ jobs:
       run: mvn -B install -DskipTests
     - name: Run load test
       run: mvn -B -f price-processor-throttler/pom.xml -Prun-load-test-app -Dduration=${{ github.event.inputs.duration }} -Dconsumers.takes30min.count=${{ github.event.inputs.takes_30min_count }} -Dconsumers.takes1min.count=${{ github.event.inputs.takes_1min_count }} -Dconsumers.takes1microsec.count=${{ github.event.inputs.takes_1microsec_count }}
+    - name: Show stats logs
+      run: cat price-processor-throttler/target/logs/app.log
