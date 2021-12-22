@@ -34,6 +34,8 @@ jobs:
         distribution: 'adopt'
         cache: maven
     - name: Build with Maven
-      run: mvn -B install -DskipTests
+      run: mvn -B --color=always install -DskipTests
     - name: Run load test
-      run: mvn -B -f price-processor-throttler/pom.xml -Prun-load-test-app -Dduration=${{ github.event.inputs.duration }} -Dconsumers.takes30min.count=${{ github.event.inputs.takes_30min_count }} -Dconsumers.takes1min.count=${{ github.event.inputs.takes_1min_count }} -Dconsumers.takes1microsec.count=${{ github.event.inputs.takes_1microsec_count }}
+      run: mvn -B --color=always -f price-processor-throttler/pom.xml -Prun-load-test-app -Dduration=${{ github.event.inputs.duration }} -Dconsumers.takes30min.count=${{ github.event.inputs.takes_30min_count }} -Dconsumers.takes1min.count=${{ github.event.inputs.takes_1min_count }} -Dconsumers.takes1microsec.count=${{ github.event.inputs.takes_1microsec_count }}
+    - name: Show stats logs
+      run: cat target/logs/app.log
