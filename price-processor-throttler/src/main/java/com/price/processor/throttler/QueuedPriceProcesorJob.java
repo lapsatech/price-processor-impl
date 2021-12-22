@@ -2,20 +2,19 @@ package com.price.processor.throttler;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Map.Entry;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.price.processor.PriceProcessor;
 import com.price.processor.throttler.DurationMetrics.Measure;
 import com.price.processor.throttler.DurationMetrics.Stats;
+import com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate;
 
 public class QueuedPriceProcesorJob implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(QueuedPriceProcesorJob.class);
 
-  private final RateUpdatesQueue queue;
+  private final RateUpdatesBlockingQueue queue;
   private final PriceProcessor priceProcessor;
   private final DurationMetrics processorPerfomance;
 
@@ -29,7 +28,7 @@ public class QueuedPriceProcesorJob implements Runnable {
     this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), false);
   }
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor, RateUpdatesQueue queue, boolean collectStats) {
+  public QueuedPriceProcesorJob(PriceProcessor priceProcessor, RateUpdatesBlockingQueue queue, boolean collectStats) {
     this.priceProcessor = requireNonNull(priceProcessor, "priceProcessor");
     this.queue = requireNonNull(queue, "queue");
     this.processorPerfomance = collectStats
@@ -37,17 +36,17 @@ public class QueuedPriceProcesorJob implements Runnable {
         : null;
   }
 
-  public void queue(String ccyPair, double rate) {
-    queue.offer(ccyPair, rate);
+  public void queue(RateUpdate update) {
+    queue.offer(update);
   }
 
   @Override
   public void run() {
     try {
       while (!Thread.currentThread().isInterrupted()) {
-        final Entry<String, Double> e;
+        final RateUpdate e;
         if (finshOnEmptyQueue) {
-          if ((e = queue.peek()) == null) {
+          if ((e = queue.poll()) == null) {
             return; // finish if queue is empty
           }
         } else {
@@ -60,7 +59,7 @@ public class QueuedPriceProcesorJob implements Runnable {
 
         try {
           try {
-            priceProcessor.onPrice(e.getKey(), e.getValue().doubleValue());
+            priceProcessor.onPrice(e.getCcyPair(), e.getRate());
           } finally {
             if (m != null) {
               m.complete();

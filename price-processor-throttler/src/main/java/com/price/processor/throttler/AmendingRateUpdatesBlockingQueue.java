@@ -16,18 +16,18 @@ import java.util.concurrent.locks.ReentrantLock;
  * amendment won't take effect on the queue position of the entry.
  * 
  */
-public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
+public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueue {
 
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
 
-  private final Map<String, Double> queue = new LinkedHashMap<>();
+  private final Map<String, RateUpdate> queue = new LinkedHashMap<>();
 
   @Override
-  public void offer(String ccyPair, double rate) {
+  public void offer(RateUpdate update) {
     lock.lock();
     try {
-      queue.put(ccyPair, rate);
+      queue.put(update.getCcyPair(), update);
       notEmpty.signal();
     } finally {
       lock.unlock();
@@ -36,13 +36,13 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
   }
 
   @Override
-  public Entry<String, Double> peek() {
+  public RateUpdate poll() {
     lock.lock();
     try {
-      Iterator<Entry<String, Double>> i = queue.entrySet().iterator();
-      Entry<String, Double> e = i.next();
+      Iterator<Entry<String, RateUpdate>> i = queue.entrySet().iterator();
+      Entry<String, RateUpdate> e = i.next();
       i.remove();
-      return e;
+      return e.getValue();
     } catch (NoSuchElementException e1) {
       return null;
     } finally {
@@ -51,9 +51,9 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
   }
 
   @Override
-  public Entry<String, Double> take() throws InterruptedException {
-    Entry<String, Double> e;
-    while ((e = peek()) == null) {
+  public RateUpdate take() throws InterruptedException {
+    RateUpdate e;
+    while ((e = poll()) == null) {
       lock.lock();
       try {
         notEmpty.await();
@@ -65,8 +65,8 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
   }
 
   @Override
-  public Entry<String, Double> take(long time, TimeUnit unit) throws InterruptedException, TimeoutException {
-    Entry<String, Double> e = peek();
+  public RateUpdate take(long time, TimeUnit unit) throws InterruptedException, TimeoutException {
+    RateUpdate e = poll();
     if (e != null) {
       return e;
     }
@@ -74,7 +74,7 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
     lock.lock();
     try {
       if (notEmpty.await(time, unit)) {
-        e = peek();
+        e = poll();
       }
     } finally {
       lock.unlock();
@@ -85,4 +85,5 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesQueue {
     }
     throw new TimeoutException();
   }
+
 }

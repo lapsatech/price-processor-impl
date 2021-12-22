@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import com.price.processor.PriceProcessor;
 import com.price.processor.throttler.DurationMetrics.Measure;
 import com.price.processor.throttler.DurationMetrics.Stats;
+import com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate;
 
 public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
@@ -53,8 +54,10 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
         ? null
         : onPricePerfomance.newMeasure();
 
+    final RateUpdate update = RateUpdate.of(ccyPair, rate);
+
     try {
-      processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(ccyPair, rate));
+      processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(update));
     } finally {
       if (m != null) {
         m.complete();

@@ -1,8 +1,8 @@
 package com.price.processor.throttler
 
-import java.util.AbstractMap.SimpleEntry
+import static com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate.of
+
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeoutException
 
 import com.price.processor.PriceProcessor
 
@@ -14,12 +14,12 @@ class QueuedPriceProcesorJobTest extends Specification {
 
     given:
     def pp = Mock(PriceProcessor)
-    def q = Mock(RateUpdatesQueue)
+    def q = Mock(RateUpdatesBlockingQueue)
 
     q.take() >>> [
-      new SimpleEntry('ccy1', 10d),
-      new SimpleEntry('ccy2', 20d),
-      new SimpleEntry('ccy3', 30d)
+      of('ccy1', 10d),
+      of('ccy2', 20d),
+      of('ccy3', 30d)
     ] >> { Thread.sleep(10000); throw new RuntimeException("Please make sure you interrupted the job's thread") } // no more updates in a query
 
 
