@@ -33,9 +33,18 @@
 
   </Appenders>
   <Loggers>
-    <Root level="info" additivity="false">
-      <appender-ref ref="fileLogger" />
-      <appender-ref ref="console" />
+
+    <Logger name="com.price.processor.throttler" level="debug"
+      additivity="false">
+      <AppenderRef ref="fileLogger" />
+      <AppenderRef ref="console" level="info" />
+    </Logger>
+
+    <Root level="debug" additivity="false">
+      <AppenderRef ref="console" level="info" />
     </Root>
+
+
+
   </Loggers>
 </Configuration>

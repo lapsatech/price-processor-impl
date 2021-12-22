@@ -1,4 +1,4 @@
-package com.price.processor.test.app.config;
+package com.price.processor.throttler.test.app.config;
 
 import java.time.Duration;
 import java.util.List;
@@ -12,10 +12,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-import com.price.processor.test.app.services.Generators;
-import com.price.processor.test.app.services.NamePrefixThreadFactory;
-import com.price.processor.test.app.services.SamplePriceGenerator;
 import com.price.processor.throttler.PriceThrottler;
+import com.price.processor.throttler.test.app.services.Generators;
+import com.price.processor.throttler.test.app.services.NamePrefixThreadFactory;
+import com.price.processor.throttler.test.app.services.SamplePriceGenerator;
 
 @Configuration
 @Import(PriceThrottllerConfig.class)

@@ -1,4 +1,4 @@
-package com.price.processor.test.app.config;
+package com.price.processor.throttler.test.app.config;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -9,8 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.price.processor.test.app.services.Consumers;
-import com.price.processor.test.app.services.SamplePriceConsumer;
+import com.price.processor.throttler.test.app.services.Consumers;
+import com.price.processor.throttler.test.app.services.SamplePriceConsumer;
 
 @Configuration
 public class ConsumersConfig {

@@ -59,8 +59,8 @@ public final class DurationMetrics {
     };
   }
 
-  public Measure newGroupedMeasure(Object group) {
-    return childs.computeIfAbsent(group, g -> new DurationMetrics(this))
+  public Measure newGroupedMeasure(Object groupBy) {
+    return childs.computeIfAbsent(groupBy, g -> new DurationMetrics(this))
         .newMeasure();
   }
 
