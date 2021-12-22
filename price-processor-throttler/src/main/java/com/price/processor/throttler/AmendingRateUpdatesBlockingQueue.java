@@ -1,10 +1,11 @@
 package com.price.processor.throttler;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+import static java.util.Objects.requireNonNull;
+
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
@@ -21,33 +22,59 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
 
-  private final Map<String, RateUpdate> queue = new LinkedHashMap<>();
+  private final Map<String, RateUpdate> updates = new HashMap<>(200);
+  private final Queue<String> ccyPairQueue = new LinkedList<>();
 
   @Override
   public void offer(RateUpdate update) {
     lock.lock();
     try {
-      queue.put(update.getCcyPair(), update);
-      notEmpty.signal();
+      if (updates.put(update.getCcyPair(), update) == null) {// if new ccyPair
+        if (ccyPairQueue.offer(update.getCcyPair())) { // if put to the queue successful
+          notEmpty.signal();
+        }
+      }
     } finally {
       lock.unlock();
     }
-
   }
 
   @Override
   public RateUpdate poll() {
+    final RateUpdate update;
     lock.lock();
     try {
-      Iterator<Entry<String, RateUpdate>> i = queue.entrySet().iterator();
-      Entry<String, RateUpdate> e = i.next();
-      i.remove();
-      return e.getValue();
-    } catch (NoSuchElementException e1) {
-      return null;
+      final String ccyPair = ccyPairQueue.poll();
+      if (ccyPair == null) {
+        return null;
+      }
+      update = updates.remove(ccyPair);
     } finally {
       lock.unlock();
     }
+    return requireNonNull(update, "Integrity violation exception");
+  }
+
+  @Override
+  public RateUpdate poll(long time, TimeUnit unit) throws InterruptedException {
+    RateUpdate e = poll();
+    if (e != null) {
+      return e;
+    }
+
+    lock.lock();
+    try {
+      if (notEmpty.await(time, unit)) {
+        e = poll();
+      }
+    } finally {
+      lock.unlock();
+    }
+
+    if (e != null) {
+      return e;
+    }
+    return null;
   }
 
   @Override
@@ -66,20 +93,7 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
 
   @Override
   public RateUpdate take(long time, TimeUnit unit) throws InterruptedException, TimeoutException {
-    RateUpdate e = poll();
-    if (e != null) {
-      return e;
-    }
-
-    lock.lock();
-    try {
-      if (notEmpty.await(time, unit)) {
-        e = poll();
-      }
-    } finally {
-      lock.unlock();
-    }
-
+    RateUpdate e = poll(time, unit);
     if (e != null) {
       return e;
     }
