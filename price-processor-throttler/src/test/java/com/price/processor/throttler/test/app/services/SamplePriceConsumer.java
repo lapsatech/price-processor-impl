@@ -1,4 +1,4 @@
-package com.price.processor.test.app.services;
+package com.price.processor.throttler.test.app.services;
 
 import static com.price.processor.throttler.DurationUtils.threadSleep;
 import static java.util.Objects.requireNonNull;
@@ -81,9 +81,9 @@ public class SamplePriceConsumer implements PriceProcessor {
   }
 
   public void logStats() {
-    LOGGER.info("===> '{}' overall stats are {}", name, metrics.getStats());
+    LOGGER.debug("===> '{}' overall stats are {}", name, metrics.getStats());
     metrics.getGroupsStats()
-        .forEach((ccyPair, stats) -> LOGGER.info("===> '{}' >>> '{}' stats are {}", name, ccyPair, stats));
+        .forEach((ccyPair, stats) -> LOGGER.debug("===> '{}' >>> '{}' stats are {}", name, ccyPair, stats));
   }
 
   @Override
@@ -98,6 +98,6 @@ public class SamplePriceConsumer implements PriceProcessor {
 
   @Override
   public String toString() {
-    return "SamplePriceConsumer [name=" + name + "]";
+    return name;
   }
 }

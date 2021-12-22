@@ -1,4 +1,4 @@
-package com.price.processor.test.app;
+package com.price.processor.throttler.test.app;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.impl.Log4jContextFactory;
@@ -6,8 +6,8 @@ import org.apache.logging.log4j.core.util.DefaultShutdownCallbackRegistry;
 import org.apache.logging.log4j.spi.LoggerContextFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
-import com.price.processor.test.app.config.AppConfig;
-import com.price.processor.test.app.services.App;
+import com.price.processor.throttler.test.app.config.AppConfig;
+import com.price.processor.throttler.test.app.services.App;
 
 public class Main {
 

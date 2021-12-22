@@ -1,4 +1,4 @@
-package com.price.processor.test.app.config;
+package com.price.processor.throttler.test.app.config;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-import com.price.processor.test.app.services.Consumers;
-import com.price.processor.test.app.services.NamePrefixThreadFactory;
 import com.price.processor.throttler.PriceThrottler;
+import com.price.processor.throttler.test.app.services.Consumers;
+import com.price.processor.throttler.test.app.services.NamePrefixThreadFactory;
 
 @Configuration
 @Import(ConsumersConfig.class)
@@ -26,7 +26,7 @@ public class PriceThrottllerConfig {
 
   @Bean
   public PriceThrottler priceThrottler() {
-    PriceThrottler pt = new PriceThrottler(consumersPool());
+    PriceThrottler pt = new PriceThrottler(consumersPool(), true);
     consumers.stream().forEach(pt::subscribe);
     return pt;
   }

@@ -1,4 +1,4 @@
-package com.price.processor.test.app.services;
+package com.price.processor.throttler.test.app.services;
 
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;

@@ -1,4 +1,4 @@
-package com.price.processor.test.app.services;
+package com.price.processor.throttler.test.app.services;
 
 import static com.price.processor.throttler.DurationUtils.threadSleep;
 import static java.util.Objects.requireNonNull;
@@ -102,7 +102,7 @@ public class SamplePriceGenerator implements Runnable {
   }
 
   public void logStats() {
-    LOGGER.info("<--- '{}' pair consumption stats are {}", ccyPair, consumerPerfomanceMetrics.getStats());
+    LOGGER.debug("<--- '{}' pair consumption stats are {}", ccyPair, consumerPerfomanceMetrics.getStats());
   }
 
 }
