@@ -1,6 +1,7 @@
 package com.price.processor.throttler;
 
-import java.util.Enumeration;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -33,6 +34,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
   private final ConcurrentHashMap<PriceProcessor, RegistryEntry> processorsRegistry = new ConcurrentHashMap<>();
   private final ExecutorService threadPool;
   private final DurationMetrics onPricePerfomance;
+  private final DurationMetrics processorOnPricePerfomance;
 
   public PriceThrottler(ExecutorService threadPool) {
     this(threadPool, false);
@@ -40,26 +42,28 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
   public PriceThrottler(ExecutorService threadPool, boolean collectStats) {
     this.threadPool = threadPool;
-    this.onPricePerfomance = collectStats
-        ? new DurationMetrics()
-        : null;
+    if (collectStats) {
+      this.onPricePerfomance = new DurationMetrics();
+      this.processorOnPricePerfomance = new DurationMetrics();
+    } else {
+      this.onPricePerfomance = null;
+      this.processorOnPricePerfomance = null;
+    }
   }
 
   @Override
   public void onPrice(String ccyPair, double rate) {
     checkState();
+
     final Measure m = onPricePerfomance == null
         ? null
         : onPricePerfomance.newMeasure();
 
     final RateUpdate update = RateUpdate.of(ccyPair, rate);
+    processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(update));
 
-    try {
-      processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(update));
-    } finally {
-      if (m != null) {
-        m.complete();
-      }
+    if (m != null) {
+      m.complete();
     }
   }
 
@@ -70,7 +74,8 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
       throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
     }
     processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
-      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp, onPricePerfomance != null);
+      DurationMetrics metrics = processorOnPricePerfomance == null ? null : processorOnPricePerfomance.groupMetrics(pp);
+      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp, metrics);
       Future<?> future = threadPool.submit(proc);
       return new RegistryEntry(proc, future);
     });
@@ -81,10 +86,6 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     processorsRegistry.computeIfPresent(priceProcessor, (pp, registryEntry) -> {
       if (!registryEntry.future.isDone()) {
         registryEntry.future.cancel(true);
-      }
-      final Stats stats;
-      if ((stats = registryEntry.proc.getProcessorPerfomanceStats()) != null) {
-        LOG.info("PriceProcessor '{}' perfomance stats are {}", pp, stats);
       }
       return null; // removes given processor from the registry
     });
@@ -98,10 +99,24 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     return processorsRegistry.size();
   }
 
-  public Stats getOnPricePerfomanceStats() {
+  public Optional<Stats> getOnPricePerfomanceStats() {
     return onPricePerfomance == null
-        ? null
-        : onPricePerfomance.getStats();
+        ? Optional.empty()
+        : Optional.of(onPricePerfomance.getStats());
+  }
+
+  public Optional<Map<Object, Stats>> getProcessorPerfomanceStats() {
+    return processorOnPricePerfomance == null
+        ? Optional.empty()
+        : Optional.of(processorOnPricePerfomance.getGroupsStats());
+  }
+
+  public void logStats() {
+    getOnPricePerfomanceStats()
+        .ifPresent(stats -> LOG.info("PriceThrottler.onPrice() stats are {}", stats));
+    getProcessorPerfomanceStats()
+        .ifPresent(group -> group
+            .forEach((pp, stats) -> LOG.info("PriceProcessor[{}].onPrice() stats are {}", pp, stats)));
   }
 
   private void checkState() {
@@ -115,9 +130,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     if (!stateClosed.compareAndSet(false, true)) {
       throw new IllegalStateException("Resource is closed already");
     }
-    if (onPricePerfomance != null) {
-      LOG.info("PriceThrottler this.onPrice() perfomance stats are {}", onPricePerfomance.getStats());
-    }
     unsubscribeAll();
+    logStats();
   }
 }

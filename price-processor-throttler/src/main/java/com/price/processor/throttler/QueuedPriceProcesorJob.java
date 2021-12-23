@@ -7,36 +7,39 @@ import org.slf4j.LoggerFactory;
 
 import com.price.processor.PriceProcessor;
 import com.price.processor.throttler.DurationMetrics.Measure;
-import com.price.processor.throttler.DurationMetrics.Stats;
 import com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate;
 
 public class QueuedPriceProcesorJob implements Runnable {
+
+  public static class OnPriceIncompleteException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(QueuedPriceProcesorJob.class);
 
   private final RateUpdatesBlockingQueue queue;
   private final PriceProcessor priceProcessor;
-  private final DurationMetrics processorPerfomance;
 
-  private transient boolean finshOnEmptyQueue = false;
+  private final DurationMetrics processorOnPricePerfomance;
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor, boolean collectStats) {
-    this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), collectStats);
+  QueuedPriceProcesorJob(PriceProcessor priceProcessor, DurationMetrics processorMetrics) {
+    this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), processorMetrics);
   }
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor) {
-    this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), false);
+  QueuedPriceProcesorJob(PriceProcessor priceProcessor) {
+    this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), null);
   }
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor, RateUpdatesBlockingQueue queue, boolean collectStats) {
+  QueuedPriceProcesorJob(
+      PriceProcessor priceProcessor,
+      RateUpdatesBlockingQueue queue,
+      DurationMetrics processorOnPricePerfomance) {
     this.priceProcessor = requireNonNull(priceProcessor, "priceProcessor");
     this.queue = requireNonNull(queue, "queue");
-    this.processorPerfomance = collectStats
-        ? new DurationMetrics()
-        : null;
+    this.processorOnPricePerfomance = processorOnPricePerfomance;
   }
 
-  public void queue(RateUpdate update) {
+  void queue(RateUpdate update) {
     queue.offer(update);
   }
 
@@ -44,44 +47,24 @@ public class QueuedPriceProcesorJob implements Runnable {
   public void run() {
     try {
       while (!Thread.currentThread().isInterrupted()) {
-        final RateUpdate e;
-        if (finshOnEmptyQueue) {
-          if ((e = queue.poll()) == null) {
-            return; // finish if queue is empty
-          }
-        } else {
-          e = queue.take();
-        }
-
-        final Measure m = processorPerfomance == null
-            ? null
-            : processorPerfomance.newMeasure();
-
+        final RateUpdate e = queue.take();
         try {
-          try {
+          if (processorOnPricePerfomance == null) {
             priceProcessor.onPrice(e.getCcyPair(), e.getRate());
-          } finally {
-            if (m != null) {
-              m.complete();
-            }
+          } else {
+            final Measure m = processorOnPricePerfomance.newMeasure();
+            priceProcessor.onPrice(e.getCcyPair(), e.getRate());
+            m.complete();
           }
+        } catch (OnPriceIncompleteException incomplete) {
+          // We want to collect stats for completed invocations only
+          LOG.debug("OnPrice incompleted", e);
         } catch (RuntimeException re) {
           LOG.error("Excecption occured while running price processor job", re);
         }
-
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-  }
-
-  public Stats getProcessorPerfomanceStats() {
-    return processorPerfomance == null
-        ? null
-        : processorPerfomance.getStats();
-  }
-
-  public void stopGracceful() {
-    finshOnEmptyQueue = true;
   }
 }

@@ -1,21 +1,25 @@
 package com.price.processor.throttler;
 
+import static com.price.processor.throttler.DurationUtils.toHumanReadable;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 public final class DurationMetrics {
 
-  private final ReentrantLock lock = new ReentrantLock();
+  private final ReadWriteLock startedLock = new ReentrantReadWriteLock();
+  private final ReadWriteLock completedLock = new ReentrantReadWriteLock();
 
-  private long numberOfIterations = 0;
-  private Duration totalDuration = Duration.ZERO;
-  private Duration averageDuration = null;
+  private volatile long startedCount = 0;
+  private volatile long completedCount = 0;
+  private volatile Duration completedDurationTotal = Duration.ZERO;
+  private volatile Duration completedDurationAverage = null;
 
   private final Map<Object, DurationMetrics> childs = new ConcurrentHashMap<>();
   private final DurationMetrics parent;
@@ -28,101 +32,94 @@ public final class DurationMetrics {
     this.parent = parent;
   }
 
-  public long add(Duration duration) {
-    lock.lock();
-    try {
-      numberOfIterations++;
-      totalDuration = totalDuration.plus(duration);
-      averageDuration = totalDuration.dividedBy(numberOfIterations);
-      if (parent != null) {
-        parent.add(duration);
-      }
-    } finally {
-      lock.unlock();
+  private long addStarted() {
+    if (parent != null) {
+      parent.addStarted();
     }
-    return numberOfIterations;
+
+    startedLock.writeLock().lock();
+    try {
+      return ++startedCount;
+    } finally {
+      startedLock.writeLock().unlock();
+    }
+  }
+
+  private long addCompleted(Duration duration) {
+    if (parent != null) {
+      parent.addCompleted(duration);
+    }
+
+    completedLock.writeLock().lock();
+    try {
+      completedDurationTotal = completedDurationTotal.plus(duration);
+      completedDurationAverage = completedDurationTotal.dividedBy(++completedCount);
+      return completedCount;
+    } finally {
+      completedLock.writeLock().unlock();
+    }
   }
 
   public interface Measure extends AutoCloseable {
-    @Override
-    void close();
 
-    default void complete() {
-      close();
+    @Override
+    default void close() {
+      complete();
     }
+
+    void complete();
   }
 
   public Measure newMeasure() {
+    addStarted();
     final Instant started = Instant.now();
     return () -> {
-      add(Duration.between(started, Instant.now()));
+      addCompleted(Duration.between(started, Instant.now()));
     };
   }
 
-  public Measure newGroupedMeasure(Object groupBy) {
-    return childs.computeIfAbsent(groupBy, g -> new DurationMetrics(this))
-        .newMeasure();
+  public DurationMetrics groupMetrics(Object groupBy) {
+    return childs.computeIfAbsent(groupBy, g -> new DurationMetrics(this));
   }
 
   public static class Stats {
 
-    private final long numberOfIterations;
-    private final Duration totalDuration;
-    private final Duration averageDuration;
+    private final long startedCount;
+    private final long completedCount;
+    private final Duration completedDurationTotal;
+    private final Duration completedDurationAverage;
 
-    private Stats(long numberOfIterations, Duration totalDuration, Duration averageDuration) {
-      this.numberOfIterations = numberOfIterations;
-      this.totalDuration = totalDuration;
-      this.averageDuration = averageDuration;
-    }
-
-    public long getNumber() {
-      return numberOfIterations;
-    }
-
-    public Duration getTotalDuration() {
-      return totalDuration;
-    }
-
-    public Duration getAverageDuration() {
-      return averageDuration;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(averageDuration, numberOfIterations, totalDuration);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj)
-        return true;
-      if (obj == null)
-        return false;
-      if (getClass() != obj.getClass())
-        return false;
-      Stats other = (Stats) obj;
-      return Objects.equals(averageDuration, other.averageDuration)
-          && numberOfIterations == other.numberOfIterations
-          && Objects.equals(totalDuration, other.totalDuration);
+    private Stats(long startedCount, long completedCount, Duration completedDurationTotal,
+        Duration complletedDurationAverage) {
+      this.startedCount = startedCount;
+      this.completedCount = completedCount;
+      this.completedDurationTotal = completedDurationTotal;
+      this.completedDurationAverage = complletedDurationAverage;
     }
 
     @Override
     public String toString() {
       return "["
-          + "numberOfIterations=" + numberOfIterations
-          + ", averageDuration=" + DurationUtils.toHumanReadable(averageDuration)
-          + ", totalDuration=" + DurationUtils.toHumanReadable(totalDuration)
+          + "startedCount=" + startedCount
+          + ", completedCount=" + completedCount
+          + ", completedDurationTotal=" + toHumanReadable(completedDurationTotal)
+          + ", completedDurationAverage=" + toHumanReadable(completedDurationAverage)
           + "]";
     }
+
   }
 
   public Stats getStats() {
-    lock.lock();
+    startedLock.readLock().lock();
     try {
-      return new Stats(numberOfIterations, totalDuration, averageDuration);
+      completedLock.readLock().lock();
+      try {
+        return new Stats(startedCount, completedCount, completedDurationTotal, completedDurationAverage);
+      } finally {
+        completedLock.readLock().unlock();
+      }
     } finally {
-      lock.unlock();
+      startedLock.readLock().unlock();
     }
   }
 

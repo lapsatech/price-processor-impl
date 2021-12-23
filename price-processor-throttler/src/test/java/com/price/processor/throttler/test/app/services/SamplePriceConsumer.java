@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import com.price.processor.PriceProcessor;
 import com.price.processor.throttler.DurationMetrics;
 import com.price.processor.throttler.DurationMetrics.Measure;
+import com.price.processor.throttler.QueuedPriceProcesorJob.OnPriceIncompleteException;
 
 public class SamplePriceConsumer implements PriceProcessor {
 
@@ -72,11 +73,12 @@ public class SamplePriceConsumer implements PriceProcessor {
   @Override
   public void onPrice(String ccyPair, double rate) {
     try {
-      Measure measure = metrics.newGroupedMeasure(ccyPair);
+      Measure measure = metrics.groupMetrics(ccyPair).newMeasure();
       threadSleep(processTime);
       measure.complete();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      throw new OnPriceIncompleteException();
     }
   }
 
