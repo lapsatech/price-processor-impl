@@ -4,6 +4,7 @@ import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,17 +23,16 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     private final QueuedPriceProcesorJob proc;
     private final Future<?> future;
 
-    private RegistryEntry(QueuedPriceProcesorJob proc, Future<?> processFuture) {
+    private RegistryEntry(QueuedPriceProcesorJob proc, Future<?> future) {
       this.proc = proc;
-      this.future = processFuture;
+      this.future = future;
     }
   }
 
-  private final ExecutorService threadPool;
+  private final AtomicBoolean stateClosed = new AtomicBoolean(false);
   private final ConcurrentHashMap<PriceProcessor, RegistryEntry> processorsRegistry = new ConcurrentHashMap<>();
+  private final ExecutorService threadPool;
   private final DurationMetrics onPricePerfomance;
-
-  private transient boolean stateClosed = false;
 
   public PriceThrottler(ExecutorService threadPool) {
     this(threadPool, false);
@@ -47,9 +47,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
   @Override
   public void onPrice(String ccyPair, double rate) {
-    if (stateClosed) {
-      throw new IllegalStateException("Resource is closed");
-    }
+    checkState();
     final Measure m = onPricePerfomance == null
         ? null
         : onPricePerfomance.newMeasure();
@@ -67,16 +65,14 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
 
   @Override
   public void subscribe(PriceProcessor priceProcessor) {
-    if (stateClosed) {
-      throw new IllegalStateException("Resource is closed");
-    }
+    checkState();
     if (priceProcessor == this) {
       throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
     }
     processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
       QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp, onPricePerfomance != null);
-      Future<?> processFuture = threadPool.submit(proc);
-      return new RegistryEntry(proc, processFuture);
+      Future<?> future = threadPool.submit(proc);
+      return new RegistryEntry(proc, future);
     });
   }
 
@@ -94,6 +90,10 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     });
   }
 
+  public void unsubscribeAll() {
+    processorsRegistry.forEachKey(Long.MAX_VALUE, this::unsubscribe);
+  }
+
   public int getSubscribersCount() {
     return processorsRegistry.size();
   }
@@ -104,17 +104,20 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
         : onPricePerfomance.getStats();
   }
 
+  private void checkState() {
+    if (stateClosed.get()) {
+      throw new IllegalStateException("Resource is closed");
+    }
+  }
+
   @Override
   public void close() {
-    stateClosed = true;
+    if (!stateClosed.compareAndSet(false, true)) {
+      throw new IllegalStateException("Resource is closed already");
+    }
     if (onPricePerfomance != null) {
       LOG.info("PriceThrottler this.onPrice() perfomance stats are {}", onPricePerfomance.getStats());
     }
-    while (!processorsRegistry.isEmpty()) {
-      Enumeration<PriceProcessor> procs = processorsRegistry.keys();
-      while (procs.hasMoreElements()) {
-        unsubscribe(procs.nextElement());
-      }
-    }
+    unsubscribeAll();
   }
 }

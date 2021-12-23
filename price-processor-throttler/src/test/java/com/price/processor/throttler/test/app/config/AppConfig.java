@@ -18,13 +18,13 @@ public class AppConfig {
   @Autowired
   private Generators generators;
 
-  @Value("${duration:PT20S}")
+  @Value("${app.duration:PT20S}")
   private String durationString;
 
   @Bean
   public Duration duration() {
     return Duration.parse(durationString);
-  };
+  }
 
   @Bean
   public App app() {

@@ -1,6 +1,8 @@
 package com.price.processor.throttler
 
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 import com.price.processor.PriceProcessor
 
@@ -10,36 +12,41 @@ class PriceThrottlerTest extends Specification {
 
   def 'test subscribe/unsubscribe'() {
     given:
-    def pool = Executors.newFixedThreadPool(3)
-    def pt = new PriceThrottler(pool)
+    def pt = new PriceThrottler(Stub(ExecutorService) {
+      submit(_) >> Stub(Future)
+    })
 
-    def s1 = Mock(PriceProcessor)
-    def s2 = Mock(PriceProcessor)
-    def s3 = Mock(PriceProcessor)
-
+    def s1 = Stub(PriceProcessor)
+    def s2 = Stub(PriceProcessor)
+    def s3 = Stub(PriceProcessor)
+    def s4 = Stub(PriceProcessor)
+    
     when:
     pt.subscribe(s1)
     pt.subscribe(s2)
     pt.subscribe(s3)
-
+    pt.subscribe(s4)
+    
     then:
-    pt.subscribersCount == 3
+    pt.subscribersCount == 4
 
     when:
     pt.unsubscribe(s1)
 
     then:
-    pt.subscribersCount == 2
+    pt.subscribersCount == 3
 
     then:
     pt.unsubscribe(s2)
-    pt.unsubscribe(s3)
 
     then:
+    pt.subscribersCount == 2
+    
+    when:
+    pt.unsubscribeAll()
+    
+    then:
     pt.subscribersCount == 0
-
-    cleanup:
-    pool.shutdownNow()
   }
 
   def 'test subscribers getting updates'() {
@@ -76,5 +83,54 @@ class PriceThrottlerTest extends Specification {
 
     cleanup:
     pool.shutdownNow()
+  }
+
+  def 'test closed state'() {
+
+    given:
+    def pt = new PriceThrottler(Stub(ExecutorService) {
+      submit(_) >> Stub(Future)
+    })
+
+    when:
+    pt.subscribe(Stub(PriceProcessor))
+    pt.subscribe(Stub(PriceProcessor))
+    pt.subscribe(Stub(PriceProcessor))
+
+    then:
+    pt.subscribersCount == 3
+
+    when:
+    pt.onPrice('ccy', 123d)
+
+    then:
+    noExceptionThrown()
+
+    when:
+    pt.close()
+
+    then:
+    pt.subscribersCount == 0
+
+    when:
+    pt.onPrice('ccy', 123d)
+
+    then:
+    def e1 = thrown(IllegalStateException)
+    e1.message == 'Resource is closed'
+
+    when:
+    pt.subscribe(Stub(PriceProcessor))
+
+    then:
+    def e2 = thrown(IllegalStateException)
+    e2.message == 'Resource is closed'
+
+    when:
+    pt.close()
+
+    then:
+    def e3 = thrown(IllegalStateException)
+    e3.message == 'Resource is closed already'
   }
 }
