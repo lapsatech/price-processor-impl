@@ -11,6 +11,10 @@ import com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate;
 
 public class QueuedPriceProcesorJob implements Runnable {
 
+  public static class OnPriceIncompleteException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(QueuedPriceProcesorJob.class);
 
   private final RateUpdatesBlockingQueue queue;
@@ -18,15 +22,15 @@ public class QueuedPriceProcesorJob implements Runnable {
 
   private final DurationMetrics processorOnPricePerfomance;
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor, DurationMetrics processorMetrics) {
+  QueuedPriceProcesorJob(PriceProcessor priceProcessor, DurationMetrics processorMetrics) {
     this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), processorMetrics);
   }
 
-  public QueuedPriceProcesorJob(PriceProcessor priceProcessor) {
+  QueuedPriceProcesorJob(PriceProcessor priceProcessor) {
     this(priceProcessor, new AmendingRateUpdatesBlockingQueue(), null);
   }
 
-  public QueuedPriceProcesorJob(
+  QueuedPriceProcesorJob(
       PriceProcessor priceProcessor,
       RateUpdatesBlockingQueue queue,
       DurationMetrics processorOnPricePerfomance) {
@@ -35,12 +39,8 @@ public class QueuedPriceProcesorJob implements Runnable {
     this.processorOnPricePerfomance = processorOnPricePerfomance;
   }
 
-  public void queue(RateUpdate update) {
+  void queue(RateUpdate update) {
     queue.offer(update);
-  }
-
-  public static class OnPriceIncompleteException extends RuntimeException {
-    private static final long serialVersionUID = 1L;
   }
 
   @Override

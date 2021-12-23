@@ -34,7 +34,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
   private final ConcurrentHashMap<PriceProcessor, RegistryEntry> processorsRegistry = new ConcurrentHashMap<>();
   private final ExecutorService threadPool;
   private final DurationMetrics onPricePerfomance;
-  private final DurationMetrics processorPerfomance;
+  private final DurationMetrics processorOnPricePerfomance;
 
   public PriceThrottler(ExecutorService threadPool) {
     this(threadPool, false);
@@ -44,10 +44,10 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
     this.threadPool = threadPool;
     if (collectStats) {
       this.onPricePerfomance = new DurationMetrics();
-      this.processorPerfomance = new DurationMetrics();
+      this.processorOnPricePerfomance = new DurationMetrics();
     } else {
       this.onPricePerfomance = null;
-      this.processorPerfomance = null;
+      this.processorOnPricePerfomance = null;
     }
   }
 
@@ -74,10 +74,8 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
       throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
     }
     processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
-      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp,
-          processorPerfomance == null
-              ? null
-              : processorPerfomance.groupMetrics(pp));
+      DurationMetrics metrics = processorOnPricePerfomance == null ? null : processorOnPricePerfomance.groupMetrics(pp);
+      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp, metrics);
       Future<?> future = threadPool.submit(proc);
       return new RegistryEntry(proc, future);
     });
@@ -108,9 +106,9 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
   }
 
   public Optional<Map<Object, Stats>> getProcessorPerfomanceStats() {
-    return processorPerfomance == null
+    return processorOnPricePerfomance == null
         ? Optional.empty()
-        : Optional.of(processorPerfomance.getGroupsStats());
+        : Optional.of(processorOnPricePerfomance.getGroupsStats());
   }
 
   public void logStats() {

@@ -73,7 +73,7 @@ public class SamplePriceConsumer implements PriceProcessor {
   @Override
   public void onPrice(String ccyPair, double rate) {
     try {
-      Measure measure = metrics.newGroupedMeasure(ccyPair);
+      Measure measure = metrics.groupMetrics(ccyPair).newMeasure();
       threadSleep(processTime);
       measure.complete();
     } catch (InterruptedException e) {

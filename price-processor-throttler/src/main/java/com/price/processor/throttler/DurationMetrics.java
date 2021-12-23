@@ -32,9 +32,9 @@ public final class DurationMetrics {
     this.parent = parent;
   }
 
-  private long started() {
+  private long addStarted() {
     if (parent != null) {
-      parent.started();
+      parent.addStarted();
     }
 
     startedLock.writeLock().lock();
@@ -45,9 +45,9 @@ public final class DurationMetrics {
     }
   }
 
-  private long completed(Duration duration) {
+  private long addCompleted(Duration duration) {
     if (parent != null) {
-      parent.completed(duration);
+      parent.addCompleted(duration);
     }
 
     completedLock.writeLock().lock();
@@ -71,16 +71,11 @@ public final class DurationMetrics {
   }
 
   public Measure newMeasure() {
-    started();
+    addStarted();
     final Instant started = Instant.now();
     return () -> {
-      completed(Duration.between(started, Instant.now()));
+      addCompleted(Duration.between(started, Instant.now()));
     };
-  }
-
-  public Measure newGroupedMeasure(Object groupBy) {
-    return childs.computeIfAbsent(groupBy, g -> new DurationMetrics(this))
-        .newMeasure();
   }
 
   public DurationMetrics groupMetrics(Object groupBy) {
@@ -96,7 +91,6 @@ public final class DurationMetrics {
 
     private Stats(long startedCount, long completedCount, Duration completedDurationTotal,
         Duration complletedDurationAverage) {
-      super();
       this.startedCount = startedCount;
       this.completedCount = completedCount;
       this.completedDurationTotal = completedDurationTotal;
