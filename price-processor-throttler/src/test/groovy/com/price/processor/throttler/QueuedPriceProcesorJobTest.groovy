@@ -24,7 +24,7 @@ class QueuedPriceProcesorJobTest extends Specification {
 
 
     def thread = Executors.newSingleThreadExecutor()
-    def job = new QueuedPriceProcesorJob(pp, q, true)
+    def job = new QueuedPriceProcesorJob(pp, q, null)
 
     when:
     def f = thread.submit(job)
