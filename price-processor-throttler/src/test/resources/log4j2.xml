@@ -2,7 +2,7 @@
 <Configuration status="warn">
 
   <Properties>
-    <Property name="basePath">./target/logs</Property>
+    <Property name="basePath">./</Property>
   </Properties>
 
   <Appenders>
