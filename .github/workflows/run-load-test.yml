@@ -42,4 +42,4 @@ jobs:
     - name: Run load test
       run: mvn -B --color=always -f price-processor-throttler/pom.xml -Prun-load-test-app -Dapp.duration=${{ github.event.inputs.duration }} -Dprice-throttler.collect-stats=${{ github.event.inputs.collect_stats }} -Dconsumers.takes30min.count=${{ github.event.inputs.takes_30min_count }} -Dconsumers.takes1min.count=${{ github.event.inputs.takes_1min_count }} -Dconsumers.takes1microsec.count=${{ github.event.inputs.takes_1microsec_count }}
     - name: Show stats logs
-      run: cat target/logs/app.log
+      run: cat app.log
