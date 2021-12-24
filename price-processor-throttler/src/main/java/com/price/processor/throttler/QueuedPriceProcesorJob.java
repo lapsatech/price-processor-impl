@@ -58,7 +58,7 @@ public class QueuedPriceProcesorJob implements Runnable {
           }
         } catch (OnPriceIncompleteException incomplete) {
           // We want to collect stats for completed invocations only
-          LOG.debug("OnPrice incompleted", e);
+          LOG.debug("PriceProcessor[{}].onPrice() incompleted", priceProcessor, e);
         } catch (RuntimeException re) {
           LOG.error("Excecption occured while running price processor job", re);
         }
