@@ -5,7 +5,7 @@
 
   <groupId>com.price.processor</groupId>
   <artifactId>price-processor</artifactId>
-  <version>CURRENT-SNAPSHOT</version>
+  <version>3</version>
   <packaging>pom</packaging>
 
   <modules>
@@ -14,7 +14,7 @@
   </modules>
 
   <scm>
-    <tag>HEAD</tag>
+    <tag>v3</tag>
   </scm>
 
   <properties>
