@@ -1,0 +1,31 @@
+name: Tag release
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_version:
+        description: 'Artifacts version'
+        required: true
+
+jobs:
+  tag-release:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v2
+    - name: Set up JDK 8
+      uses: actions/setup-java@v2
+      with:
+        java-version: '8'
+        distribution: 'adopt'
+        cache: maven
+    - name: Maven set artifact versions
+      run: mvn -B --color=always versions:set versions:set-scm-tag -DnewVersion=${{ github.event.inputs.artifact_version }} -DnewTag=v${{ github.event.inputs.artifact_version }} -DgenerateBackupPoms=false
+    - name: Commit and tag version
+      uses: EndBug/add-and-commit@v7
+      with:
+        message: 'Version ${{ github.event.inputs.artifact_version }}'
+        tag: 'v${{ github.event.inputs.artifact_version }} --force'
+        push: 'origin v${{ github.event.inputs.artifact_version }}'
