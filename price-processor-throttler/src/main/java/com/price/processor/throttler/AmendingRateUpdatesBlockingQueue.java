@@ -2,10 +2,8 @@ package com.price.processor.throttler;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
@@ -22,8 +20,8 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
 
-  private final Map<String, RateUpdate> updates = new HashMap<>(200);
-  private final Queue<String> ccyPairQueue = new LinkedList<>();
+  private final ConcurrentHashMap<String, RateUpdate> updates = new ConcurrentHashMap<>(200);
+  private final ConcurrentLinkedQueue<String> ccyPairQueue = new ConcurrentLinkedQueue<>();
 
   @Override
   public void offer(RateUpdate update) {
