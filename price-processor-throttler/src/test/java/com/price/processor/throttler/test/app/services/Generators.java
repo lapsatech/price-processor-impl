@@ -22,8 +22,11 @@ public class Generators implements DisposableBean {
 
   public void start() {
     this.futures = generators.stream()
-        .map(generator -> threadPool.scheduleWithFixedDelay(generator::generate, generator.getInitialDelay().toNanos(),
-            generator.getFrequency().toNanos(), TimeUnit.NANOSECONDS))
+        .map(generator -> threadPool.scheduleAtFixedRate(
+            generator::generate,
+            generator.getInitialDelay().toNanos(),
+            generator.getFrequency().toNanos(),
+            TimeUnit.NANOSECONDS))
         .collect(Collectors.toList());
   }
 
