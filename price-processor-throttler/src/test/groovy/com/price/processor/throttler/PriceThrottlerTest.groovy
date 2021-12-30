@@ -61,7 +61,7 @@ class PriceThrottlerTest extends Specification {
     pt.subscribe(s1)
     pt.subscribe(s2)
     pt.subscribe(s3)
-
+    
     when:
     pt.onPrice('ccy1', 10d)
     pt.onPrice('ccy2', 20d)

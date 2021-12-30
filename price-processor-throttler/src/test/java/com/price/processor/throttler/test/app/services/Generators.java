@@ -1,28 +1,29 @@
 package com.price.processor.throttler.test.app.services;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.springframework.beans.factory.DisposableBean;
 
 public class Generators implements DisposableBean {
 
-  private final ExecutorService threadPool;
-  private final List<SamplePriceGenerator> generators;
+  private final ScheduledExecutorService threadPool;
+  private final List<ScheduledPriceGenerator> generators;
 
-  private List<Future<?>> futures;
+  private List<ScheduledFuture<?>> futures;
 
-  public Generators(ExecutorService threadPool, List<SamplePriceGenerator> generators) {
+  public Generators(ScheduledExecutorService threadPool, List<ScheduledPriceGenerator> generators) {
     this.threadPool = threadPool;
     this.generators = generators;
   }
 
   public void start() {
     this.futures = generators.stream()
-        .map(threadPool::submit)
+        .map(generator -> threadPool.scheduleWithFixedDelay(generator::generate, generator.getInitialDelay().toNanos(),
+            generator.getFrequency().toNanos(), TimeUnit.NANOSECONDS))
         .collect(Collectors.toList());
   }
 
@@ -34,18 +35,9 @@ public class Generators implements DisposableBean {
     });
   }
 
-  public void logStats() {
-    generators.forEach(SamplePriceGenerator::logStats);
-  }
-
-  public Stream<SamplePriceGenerator> stream() {
-    return generators.stream();
-  }
-
   @Override
   public void destroy() throws Exception {
     stop();
-    logStats();
   }
 
 }

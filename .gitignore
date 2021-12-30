@@ -4,4 +4,4 @@
 .settings
 target
 
-app.log
+*.log

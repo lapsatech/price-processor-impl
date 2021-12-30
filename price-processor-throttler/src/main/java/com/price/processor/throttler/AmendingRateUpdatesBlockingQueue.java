@@ -1,7 +1,7 @@
 package com.price.processor.throttler;
 
-import static java.util.Objects.requireNonNull;
-
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
@@ -27,10 +27,9 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
   public void offer(RateUpdate update) {
     lock.lock();
     try {
-      if (updates.put(update.getCcyPair(), update) == null) {// if new ccyPair
-        if (ccyPairQueue.offer(update.getCcyPair())) { // if put to the queue successful
-          notEmpty.signal();
-        }
+      if (updates.put(update.getCcyPair(), update) == null // if new ccyPair
+          && ccyPairQueue.add(update.getCcyPair())) { // and put to the queue successful
+        notEmpty.signal();
       }
     } finally {
       lock.unlock();
@@ -38,62 +37,62 @@ public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueu
   }
 
   @Override
-  public RateUpdate poll() {
-    final RateUpdate update;
-    lock.lock();
+  public RateUpdate pollNoWait() {
+    final RateUpdate upd;
+    if (!lock.tryLock()) {
+      return null;
+    }
     try {
-      final String ccyPair = ccyPairQueue.poll();
-      if (ccyPair == null) {
+      final String ccyPair;
+      try {
+        ccyPair = ccyPairQueue.remove();
+      } catch (NoSuchElementException e) {
         return null;
       }
-      update = updates.remove(ccyPair);
+      upd = updates.remove(ccyPair);
     } finally {
       lock.unlock();
     }
-    return requireNonNull(update, "Integrity violation exception");
+    return Objects.requireNonNull(upd, "Integrity violation exception");
   }
 
   @Override
   public RateUpdate poll(long time, TimeUnit unit) throws InterruptedException {
-    RateUpdate e = poll();
-    if (e != null) {
-      return e;
+    RateUpdate upd;
+    if ((upd = pollNoWait()) != null) {
+      return upd;
     }
-
-    lock.lock();
+    lock.lockInterruptibly();
     try {
-      if (notEmpty.await(time, unit)) {
-        e = poll();
+      if (notEmpty.await(time, unit) &&
+          (upd = pollNoWait()) != null) {
+        return upd;
       }
     } finally {
       lock.unlock();
-    }
-
-    if (e != null) {
-      return e;
     }
     return null;
   }
 
   @Override
   public RateUpdate take() throws InterruptedException {
-    RateUpdate e;
-    while ((e = poll()) == null) {
-      lock.lock();
+    RateUpdate upd;
+    while ((upd = pollNoWait()) == null) {
+      lock.lockInterruptibly();
       try {
         notEmpty.await();
       } finally {
         lock.unlock();
       }
     }
-    return e;
+    return upd;
   }
 
   @Override
   public RateUpdate take(long time, TimeUnit unit) throws InterruptedException, TimeoutException {
-    RateUpdate e = poll(time, unit);
-    if (e != null) {
-      return e;
+    RateUpdate upd = poll(time, unit);
+    if (upd != null) {
+      return upd;
     }
     throw new TimeoutException();
   }
