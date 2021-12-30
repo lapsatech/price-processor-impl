@@ -71,7 +71,7 @@ public class PriceThrottler implements PriceProcessor, AutoCloseable {
   public void subscribe(PriceProcessor priceProcessor) {
     checkState();
     if (priceProcessor == this) {
-      throw new IllegalArgumentException("Infinity loop. Can't subscribe to itself");
+      throw new IllegalArgumentException("Potential infinity loop. Can't subscribe to itself");
     }
     processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
       DurationMetrics metrics = processorOnPricePerfomance == null ? null : processorOnPricePerfomance.groupMetrics(pp);

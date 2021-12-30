@@ -54,7 +54,7 @@ class AmendingRateUpdatesBlockingQueueTest extends Specification {
     when:
     def upd1 = q.take()
     def upd2 = q.take()
-    q.take(10, TimeUnit.MICROSECONDS)
+    q.take(10, TimeUnit.MILLISECONDS)
 
     then:
     upd1

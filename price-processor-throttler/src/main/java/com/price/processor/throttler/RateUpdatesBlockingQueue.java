@@ -40,7 +40,7 @@ public interface RateUpdatesBlockingQueue {
    * 
    * @return an item taken from the queue or <code>null</code> if queue is empty
    */
-  RateUpdate poll();
+  RateUpdate pollNoWait();
 
   /**
    * Polls an item from the queue if present or wait a given amount of time until
