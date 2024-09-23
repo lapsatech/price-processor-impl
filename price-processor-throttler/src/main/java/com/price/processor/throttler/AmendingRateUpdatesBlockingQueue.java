@@ -1,100 +1,55 @@
 package com.price.processor.throttler;
 
 import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * This class is implementing FIFO thread-safe queue containing updates of
- * currency pair rates. The currency pair rate value can be amended. The
- * amendment won't take effect on the queue position of the entry.
- * 
- */
+import it.unimi.dsi.fastutil.PriorityQueue;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
+
 public class AmendingRateUpdatesBlockingQueue implements RateUpdatesBlockingQueue {
 
-  private final ReentrantLock lock = new ReentrantLock();
-  private final Condition notEmpty = lock.newCondition();
+  private final ReentrantLock queueLock = new ReentrantLock();
+  private final Condition addedToQueue = queueLock.newCondition();
 
-  private final ConcurrentHashMap<String, RateUpdate> updates = new ConcurrentHashMap<>(200);
-  private final ConcurrentLinkedQueue<String> ccyPairQueue = new ConcurrentLinkedQueue<>();
+  private final Object2DoubleMap<String> latestPrices = new Object2DoubleOpenHashMap<>();
+  private final PriorityQueue<String> ccyPairs = new ObjectArrayFIFOQueue<>();
 
   @Override
-  public void offer(RateUpdate update) {
-    lock.lock();
+  public void offer(String ccyPair, double rate) throws InterruptedException {
+    queueLock.lockInterruptibly();
     try {
-      if (updates.put(update.getCcyPair(), update) == null // if new ccyPair
-          && ccyPairQueue.add(update.getCcyPair())) { // and put to the queue successful
-        notEmpty.signal();
+      if (!latestPrices.containsKey(ccyPair)) {
+        ccyPairs.enqueue(ccyPair);
       }
+      latestPrices.put(ccyPair, rate);
+      addedToQueue.signal();
     } finally {
-      lock.unlock();
+      queueLock.unlock();
     }
   }
 
   @Override
-  public RateUpdate pollNoWait() {
-    final RateUpdate upd;
-    if (!lock.tryLock()) {
-      return null;
-    }
+  public void take(UpdateConsumer updatesListener) throws InterruptedException {
+    queueLock.lockInterruptibly();
+    String ccyPair;
+    double price;
     try {
-      final String ccyPair;
-      try {
-        ccyPair = ccyPairQueue.remove();
-      } catch (NoSuchElementException e) {
-        return null;
+      for (;;) {
+        try {
+          ccyPair = ccyPairs.dequeue();
+          price = latestPrices.removeDouble(ccyPair);
+          break;
+        } catch (NoSuchElementException e) {
+          addedToQueue.await();
+        }
       }
-      upd = updates.remove(ccyPair);
+
     } finally {
-      lock.unlock();
+      queueLock.unlock();
     }
-    return Objects.requireNonNull(upd, "Integrity violation exception");
+    updatesListener.onPrice(ccyPair, price);
   }
-
-  @Override
-  public RateUpdate poll(long time, TimeUnit unit) throws InterruptedException {
-    RateUpdate upd;
-    if ((upd = pollNoWait()) != null) {
-      return upd;
-    }
-    lock.lockInterruptibly();
-    try {
-      if (notEmpty.await(time, unit) &&
-          (upd = pollNoWait()) != null) {
-        return upd;
-      }
-    } finally {
-      lock.unlock();
-    }
-    return null;
-  }
-
-  @Override
-  public RateUpdate take() throws InterruptedException {
-    RateUpdate upd;
-    while ((upd = pollNoWait()) == null) {
-      lock.lockInterruptibly();
-      try {
-        notEmpty.await();
-      } finally {
-        lock.unlock();
-      }
-    }
-    return upd;
-  }
-
-  @Override
-  public RateUpdate take(long time, TimeUnit unit) throws InterruptedException, TimeoutException {
-    RateUpdate upd = poll(time, unit);
-    if (upd != null) {
-      return upd;
-    }
-    throw new TimeoutException();
-  }
-
 }

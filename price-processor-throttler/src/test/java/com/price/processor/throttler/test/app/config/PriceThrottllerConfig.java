@@ -4,7 +4,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -25,12 +24,9 @@ public class PriceThrottllerConfig {
   @Autowired
   private Consumers consumers;
 
-  @Value("${price-throttler.collect-stats:true}")
-  private boolean collectStats;
-
   @Bean
   public PriceThrottler priceThrottler() {
-    PriceThrottler pt = new PriceThrottler(consumersPool(), collectStats);
+    PriceThrottler pt = new PriceThrottler(consumersPool());
     consumers.stream().forEach(pt::subscribe);
     return pt;
   }

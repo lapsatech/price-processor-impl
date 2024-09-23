@@ -1,136 +1,129 @@
 package com.price.processor.throttler;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.price.processor.PriceProcessor;
-import com.price.processor.throttler.DurationMetrics.Measure;
-import com.price.processor.throttler.DurationMetrics.Stats;
-import com.price.processor.throttler.RateUpdatesBlockingQueue.RateUpdate;
 
-public class PriceThrottler implements PriceProcessor, AutoCloseable {
+public class PriceThrottler implements PriceProcessor {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PriceThrottler.class);
+  private static class Runner implements Runnable {
 
-  private static class RegistryEntry {
+    private final RateUpdatesBlockingQueue queue;
+    private final PriceProcessor priceProcessor;
+    private volatile boolean stopped = false;
 
-    private final QueuedPriceProcesorJob proc;
-    private final Future<?> future;
+    private Runner(PriceProcessor priceProcessor, RateUpdatesBlockingQueue queue) {
+      this.priceProcessor = priceProcessor;
+      this.queue = queue;
+    }
 
-    private RegistryEntry(QueuedPriceProcesorJob proc, Future<?> future) {
-      this.proc = proc;
-      this.future = future;
+    @Override
+    public void run() {
+      while (!stopped) {
+        try {
+          queue.take(priceProcessor::onPrice);
+        } catch (RuntimeException e) {
+          // log error
+        } catch (InterruptedException e) {
+          stopped = true;
+        }
+      }
     }
   }
 
-  private final AtomicBoolean stateClosed = new AtomicBoolean(false);
-  private final ConcurrentHashMap<PriceProcessor, RegistryEntry> processorsRegistry = new ConcurrentHashMap<>();
+  private final Lock subscribersReader, subscribersWriter;
+  {
+    ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
+    subscribersReader = rw.readLock();
+    subscribersWriter = rw.writeLock();
+  }
+
   private final ExecutorService threadPool;
-  private final DurationMetrics onPricePerfomance;
-  private final DurationMetrics processorOnPricePerfomance;
+
+  private final Map<PriceProcessor, RateUpdatesBlockingQueue> queues = new HashMap<>();
+  private final NavigableMap<PriceProcessor, CompletableFuture<Void>> processes = new TreeMap<>();
 
   public PriceThrottler(ExecutorService threadPool) {
-    this(threadPool, false);
-  }
-
-  public PriceThrottler(ExecutorService threadPool, boolean collectStats) {
     this.threadPool = threadPool;
-    if (collectStats) {
-      this.onPricePerfomance = new DurationMetrics();
-      this.processorOnPricePerfomance = new DurationMetrics();
-    } else {
-      this.onPricePerfomance = null;
-      this.processorOnPricePerfomance = null;
-    }
   }
 
   @Override
   public void onPrice(String ccyPair, double rate) {
-    checkState();
+    subscribersReader.lock();
+    try {
+      for (RateUpdatesBlockingQueue queue : queues.values()) {
+        try {
+          queue.offer(ccyPair, rate);
+        } catch (InterruptedException e) {
+          throw new ProcessShutdownException(e);
+        }
+      }
 
-    final Measure m = onPricePerfomance == null
-        ? null
-        : onPricePerfomance.newMeasure();
-
-    final RateUpdate update = RateUpdate.of(ccyPair, rate);
-    processorsRegistry.forEachValue(Long.MAX_VALUE, registryEntry -> registryEntry.proc.queue(update));
-
-    if (m != null) {
-      m.complete();
+    } finally {
+      subscribersReader.unlock();
     }
   }
 
   @Override
   public void subscribe(PriceProcessor priceProcessor) {
-    checkState();
-    if (priceProcessor == this) {
-      throw new IllegalArgumentException("Potential infinity loop. Can't subscribe to itself");
+    subscribersWriter.lock();
+    try {
+      if (priceProcessor == this) {
+        throw new IllegalArgumentException("Can't subscribe to itself");
+      }
+
+      RateUpdatesBlockingQueue queue = new AmendingRateUpdatesBlockingQueue();
+      Runnable runner = new Runner(priceProcessor, queue);
+      CompletableFuture<Void> process = CompletableFuture.runAsync(runner, threadPool);
+
+      queues.put(priceProcessor, queue);
+      processes.put(priceProcessor, process);
+    } finally {
+      subscribersWriter.unlock();
     }
-    processorsRegistry.computeIfAbsent(priceProcessor, pp -> {
-      DurationMetrics metrics = processorOnPricePerfomance == null ? null : processorOnPricePerfomance.groupMetrics(pp);
-      QueuedPriceProcesorJob proc = new QueuedPriceProcesorJob(pp, metrics);
-      Future<?> future = threadPool.submit(proc);
-      return new RegistryEntry(proc, future);
-    });
   }
 
   @Override
   public void unsubscribe(PriceProcessor priceProcessor) {
-    processorsRegistry.computeIfPresent(priceProcessor, (pp, registryEntry) -> {
-      if (!registryEntry.future.isDone()) {
-        registryEntry.future.cancel(true);
+    subscribersWriter.lock();
+    try {
+      CompletableFuture<Void> process = processes.remove(priceProcessor);
+      if (process != null) {
+        process.cancel(true);
+        process.join();
+        queues.remove(priceProcessor);
       }
-      return null; // removes given processor from the registry
-    });
+    } finally {
+      subscribersWriter.unlock();
+    }
   }
 
   public void unsubscribeAll() {
-    processorsRegistry.forEachKey(Long.MAX_VALUE, this::unsubscribe);
+    subscribersWriter.lock();
+    try {
+      while (!processes.isEmpty()) {
+        Entry<PriceProcessor, CompletableFuture<Void>> e = processes.firstEntry();
+        unsubscribe(e.getKey());
+      }
+    } finally {
+      subscribersWriter.unlock();
+    }
   }
 
   public int getSubscribersCount() {
-    return processorsRegistry.size();
-  }
-
-  public Optional<Stats> getOnPricePerfomanceStats() {
-    return onPricePerfomance == null
-        ? Optional.empty()
-        : Optional.of(onPricePerfomance.getStats());
-  }
-
-  public Optional<Map<Object, Stats>> getProcessorPerfomanceStats() {
-    return processorOnPricePerfomance == null
-        ? Optional.empty()
-        : Optional.of(processorOnPricePerfomance.getGroupsStats());
-  }
-
-  public void logStats() {
-    getOnPricePerfomanceStats()
-        .ifPresent(stats -> LOG.info("PriceThrottler.onPrice() stats are {}", stats));
-    getProcessorPerfomanceStats()
-        .ifPresent(group -> group
-            .forEach((pp, stats) -> LOG.info("PriceProcessor[{}].onPrice() stats are {}", pp, stats)));
-  }
-
-  private void checkState() {
-    if (stateClosed.get()) {
-      throw new IllegalStateException("Resource is closed");
+    subscribersReader.lock();
+    try {
+      return processes.size();
+    } finally {
+      subscribersReader.unlock();
     }
-  }
-
-  @Override
-  public void close() {
-    if (!stateClosed.compareAndSet(false, true)) {
-      throw new IllegalStateException("Resource is closed already");
-    }
-    unsubscribeAll();
-    logStats();
   }
 }

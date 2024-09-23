@@ -12,7 +12,7 @@ class AmendingRateUpdatesBlockingQueueTest extends Specification {
 
   def 'test take amending rate and order'() {
     given:
-    def q = new AmendingRateUpdatesBlockingQueue()
+    def q = new RateUpdatesBlockingQueue()
 
     q.offer(of('eur_usd', 1000))
 
@@ -46,7 +46,7 @@ class AmendingRateUpdatesBlockingQueueTest extends Specification {
 
   def 'test take timout'() {
     given:
-    def q = new AmendingRateUpdatesBlockingQueue()
+    def q = new RateUpdatesBlockingQueue()
 
     q.offer(of('eur_usd', 1000))
     q.offer(of('gpb_usd', 2000))

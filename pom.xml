@@ -30,6 +30,7 @@
     <log4j2.version>2.16.0</log4j2.version>
     <assertj.version>3.21.0</assertj.version>
     <mockito.version>4.2.0</mockito.version>
+    <fastutil.version>8.5.13</fastutil.version>
   </properties>
 
   <dependencyManagement>
@@ -86,6 +87,16 @@
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>it.unimi.dsi</groupId>
+        <artifactId>fastutil</artifactId>
+        <version>${fastutil.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>it.unimi.dsi</groupId>
+        <artifactId>fastutil-core</artifactId>
+        <version>${fastutil.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
